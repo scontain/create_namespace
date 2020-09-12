@@ -82,7 +82,7 @@ function parse_args {
         shift
         ;;
 
-        --debug=*)
+        --debug)
         ATTEST_OPTIONS="-G --only_for_testing-debug"
         shift
         ;;
@@ -102,7 +102,7 @@ function read_properties()
 {
     file="mrenclaves.txt"
     curl "https://sconedocs.github.io/txt/mrenclaves.txt" -o "$file"
-    gpg --no-default-keyring --keyring mykey.asmrenclaves-verification.asc --verify  mrenclaves.txt || exit 1
+    gpg --no-default-keyring --keyring mrenclaves-verification.asc --verify  mrenclaves.txt || exit 1
 
   image="$1"
   while IFS="=" read -r key value; do
