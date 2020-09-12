@@ -1,0 +1,135 @@
+#!/bin/bash
+
+set -e -x
+
+function msg_color {
+    priority=$1
+    if [[ $priority == "fatal" ]] ; then
+        echo -e "\033[31m"
+    elif [[ $priority == "error" ]] ; then
+        echo -e "\033[34m"
+    elif [[ $priority == "warning" ]] ; then
+        echo -e "\033[35m"
+    elif [[ $priority == "info" ]] ; then
+        echo -e "\033[36m"
+    elif [[ $priority == "debug" ]] ; then
+        echo -e "\033[37m"
+    elif [[ $priority == "default" ]] ; then
+        echo -e "\033[00m"
+    else
+        echo -e "\033[32m";
+    fi
+}
+
+function error_exit {
+    msg_color "error"
+    echo "ERROR: $1" >&2
+    msg_color "default"
+    exit 1
+}
+
+
+function check_empty
+    if [[ -z "$2" ]] ; then
+        error_exit "$1"
+    fi
+
+# help
+
+function show_help {
+    echo -e \
+"Usage: create_namespace [OPTIONS]
+
+The following options are supported:
+  --namespace=[NS]           global namespace in the CAS
+  --cas=[CAS_ADDR]           name of the CACAS_ADDRS
+
+  -h, --help                 display this help and exit
+
+Usage example: encrypt Python image
+./create_namespace --namespace=mynamspace --cas=4-2-1.scone-cas.cf
+
+    exit 0
+}
+"
+
+# parse arguments
+
+function parse_args {
+    PARAMS=""
+
+    if [[ $# == 0 ]]; then
+        show_help
+    fi
+
+    while (( "$#" )); do
+    arg=$1
+    case "$arg" in
+
+        -h|--help)
+        show_help
+        shift
+        ;;
+
+        --namespace=*)
+        NAMESPACE="${1#*=}"
+        shift
+        ;;
+
+        --cas=*)
+        CAS_ADDR="${1#*=}"
+        shift
+        ;;
+
+        *) # preserve positional arguments
+        error_exit "unsupported command '$1'"
+        ;;
+    esac
+    done
+    # set positional arguments in their proper place
+
+    eval set -- "$PARAMS"
+}
+
+
+function read_properties()
+{
+    file="mrenclaves.txt"
+    curl "https://sconedocs.github.io/txt/mrenclaves.txt" -o "$file"
+    gpg --no-default-keyring --keyring mykey.asmrenclaves-verification.asc --verify  mrenclaves.txt || exit 1
+
+  image="$1"
+  while IFS="=" read -r key value; do
+    if [[ "$key" == "$image" ]] ; then
+       export MRENCLAVE="$value" ;
+    fi
+  done < "$file"
+}
+
+parse_args $@
+
+# ensure that we have self-signed client certificate
+
+if [[ ! -f client.pem || ! -f client-key.pem  ]] ; then
+    openssl req -newkey rsa:4096 -days 365 -nodes -x509 -out client.pem -keyout client-key.pem -config clientcertreq.conf
+fi
+
+check_empty "--namespace=NAMESPACE" "$NAMESPACE"
+check_empty "--CAS_ADDR=HOSTNAME" "$CAS_ADDR"
+
+read_properties "$CAS_ADDR"
+check_empty "--CAS_ADDR=HOSTNAME_WITH_KNOWN_MRENCLAVE" "$MRENCLAVE"
+
+scone cas attest  --only_for_testing-debug $CAS_ADDR $CAS_MRENCLAVE
+
+cat > policy.yml <<EOF
+name: $NAMESPACE
+
+access_policy:
+  read:
+   - CREATOR
+  update:
+   - CREATOR
+EOF
+
+scone session create policy.yml
