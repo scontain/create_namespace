@@ -102,8 +102,9 @@ function read_properties()
 {
     file="mrenclaves.txt"
     curl "https://sconedocs.github.io/txt/mrenclaves.txt" -o "$file"
-    gpg --no-default-keyring --keyring mrenclaves-verification.asc --verify  mrenclaves.txt || exit 1
-
+    # gpg --no-default-keyring --keyring mrenclaves-verification.asc --verify  mrenclaves.txt || exit 1
+    gpg --import mrenclaves-verification.asc
+    gpg --verify  mrenclaves.txt || exit 1
   image="$1"
   while IFS="=" read -r key value; do
     if [[ "$key" == "$image" ]] ; then
@@ -126,7 +127,7 @@ check_empty "--CAS_ADDR=HOSTNAME" "$CAS_ADDR"
 read_properties "$CAS_ADDR"
 check_empty "--CAS_ADDR=HOSTNAME_WITH_KNOWN_MRENCLAVE" "$MRENCLAVE"
 
-scone cas attest $ATTEST_OPTIONS $CAS_ADDR $CAS_MRENCLAVE
+scone cas attest $ATTEST_OPTIONS $CAS_ADDR $MRENCLAVE
 
 cat > policy.yml <<EOF
 name: $NAMESPACE
@@ -139,3 +140,5 @@ access_policy:
 EOF
 
 scone session create policy.yml || echo "Failed to create namespace"
+
+echo "Created namespace $NS"
