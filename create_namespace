@@ -43,15 +43,16 @@ function show_help {
 The following options are supported:
   --namespace=[NS]           global namespace in the CAS
   --cas=[CAS_ADDR]           name of the CACAS_ADDRS
+  --debug                    permit CAS in debug mode
 
   -h, --help                 display this help and exit
 
 Usage example: encrypt Python image
-./create_namespace --namespace=mynamspace --cas=4-2-1.scone-cas.cf
-
+./create_namespace --debug --namespace=mynamspace --cas=4-2-1.scone-cas.cf
+"
     exit 0
 }
-"
+
 
 # parse arguments
 
@@ -78,6 +79,11 @@ function parse_args {
 
         --cas=*)
         CAS_ADDR="${1#*=}"
+        shift
+        ;;
+
+        --debug=*)
+        ATTEST_OPTIONS="-G --only_for_testing-debug"
         shift
         ;;
 
@@ -120,7 +126,7 @@ check_empty "--CAS_ADDR=HOSTNAME" "$CAS_ADDR"
 read_properties "$CAS_ADDR"
 check_empty "--CAS_ADDR=HOSTNAME_WITH_KNOWN_MRENCLAVE" "$MRENCLAVE"
 
-scone cas attest  --only_for_testing-debug $CAS_ADDR $CAS_MRENCLAVE
+scone cas attest $ATTEST_OPTIONS $CAS_ADDR $CAS_MRENCLAVE
 
 cat > policy.yml <<EOF
 name: $NAMESPACE
@@ -132,4 +138,4 @@ access_policy:
    - CREATOR
 EOF
 
-scone session create policy.yml
+scone session create policy.yml || echo "Failed to create namespace"
