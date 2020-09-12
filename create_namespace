@@ -139,6 +139,6 @@ access_policy:
    - CREATOR
 EOF
 
-scone session create policy.yml || echo "Failed to create namespace"
+scone session create policy.yml || error_exit "Failed to create namespace"
 
 echo "Created namespace $NS"
